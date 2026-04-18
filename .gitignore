@@ -2,5 +2,4 @@ __pycache__/
 *.pyc
 .env
 .DS_Store
-sales_hub.db
 *.csv
