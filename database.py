@@ -152,3 +152,49 @@ def check_login(username, password):
     user = cursor.fetchone()
     conn.close()
     return user
+
+def update_sale(sale_id, branch_id, date, name, mobile, product, gross_sales, received_amount, status):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE customer_sales
+        SET branch_id = ?,
+            date = ?,
+            name = ?,
+            mobile_number = ?,
+            product_name = ?,
+            gross_sales = ?,
+            received_amount = ?,
+            status = ?
+        WHERE sale_id = ?
+    """, (branch_id, date, name, mobile, product, gross_sales, received_amount, status, sale_id))
+    conn.commit()
+    conn.close()
+
+def delete_sale(sale_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM payment_splits WHERE sale_id = ?", (sale_id,))
+    cursor.execute("DELETE FROM customer_sales WHERE sale_id = ?", (sale_id,))
+    conn.commit()
+    conn.close()
+
+def update_payment(payment_id, payment_date, amount_paid, payment_method):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE payment_splits
+        SET payment_date = ?,
+            amount_paid = ?,
+            payment_method = ?
+        WHERE payment_id = ?
+    """, (payment_date, amount_paid, payment_method, payment_id))
+    conn.commit()
+    conn.close()
+
+def delete_payment(payment_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM payment_splits WHERE payment_id = ?", (payment_id,))
+    conn.commit()
+    conn.close()

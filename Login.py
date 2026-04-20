@@ -49,4 +49,3 @@ if login_button:
             st.session_state['branch_id'] = user[3]
             st.success("Welcome, " + user[1] + "!")
             st.switch_page("pages/1_Dashboard.py")
-

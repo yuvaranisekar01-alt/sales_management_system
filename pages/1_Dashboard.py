@@ -90,7 +90,3 @@ st.pyplot(fig)
 # sales button
 if st.button("Go to Sales Page", type='primary'):
     st.switch_page("pages/2_Sales.py")
-
-
-
-
