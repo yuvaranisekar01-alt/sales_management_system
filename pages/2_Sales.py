@@ -54,34 +54,32 @@ with st.expander("📂 Show Sales Records", expanded=False):
     if sales.empty:
         st.info("No records found.")
     else:
-        # Table header
-        header_cols = st.columns([1, 2, 2, 2, 2, 2, 2, 1, 1])
-        for col, h in zip(header_cols, ["ID", "Customer", "Product", "Gross", "Received", "Pending", "Status", "✏️", "🗑️"]):
-            col.markdown(f"**{h}**")
+        # Prepare a display-friendly copy
+        display_df = sales[['sale_id', 'name', 'product_name', 'gross_sales', 'received_amount', 'pending_amount', 'status']].copy()
+        display_df.columns = ['ID', 'Customer', 'Product', 'Gross (₹)', 'Received (₹)', 'Pending (₹)', 'Status']
+
+        # Format currency columns
+        display_df['Gross (₹)']    = display_df['Gross (₹)'].apply(lambda x: f"₹{x:,.2f}")
+        display_df['Received (₹)'] = display_df['Received (₹)'].apply(lambda x: f"₹{x:,.2f}")
+        display_df['Pending (₹)']  = display_df['Pending (₹)'].apply(lambda x: f"₹{x:,.2f}")
+
+        # Render the dataframe (scrollable, fixed height)
+        st.dataframe(display_df, use_container_width=True, height=300)
 
         st.markdown("---")
 
-        # Table rows
-        for _, row in sales.iterrows():
-            sale_id = row['sale_id']
-            cols    = st.columns([1, 2, 2, 2, 2, 2, 2, 1, 1])
-            cols[0].write(sale_id)
-            cols[1].write(row['name'])
-            cols[2].write(row['product_name'])
-            cols[3].write(f"₹{row['gross_sales']:,.2f}")
-            cols[4].write(f"₹{row['received_amount']:,.2f}")
-            cols[5].write(f"₹{row['pending_amount']:,.2f}")
-            cols[6].write(row['status'])
+        # Edit / Delete controls below the dataframe
+        sale_ids = sales['sale_id'].tolist()
+        selected_id = st.selectbox("Select Sale ID to Edit or Delete", options=sale_ids)
 
-            if cols[7].button("✏️", key=f"edit_{sale_id}"):
-                st.session_state['edit_sale_id'] = sale_id
-                st.session_state['delete_confirm_id'] = None
+        col1, col2 = st.columns(2)
+        if col1.button("✏️ Edit Selected"):
+            st.session_state['edit_sale_id'] = selected_id
+            st.session_state['delete_confirm_id'] = None
 
-            if cols[8].button("🗑️", key=f"del_{sale_id}"):
-                st.session_state['delete_confirm_id'] = sale_id
-                st.session_state['edit_sale_id'] = None
-
-st.write(f"Total Records: {len(sales)}")
+        if col2.button("🗑️ Delete Selected"):
+            st.session_state['delete_confirm_id'] = selected_id
+            st.session_state['edit_sale_id'] = None
 
 # ── DELETE CONFIRMATION ──────────────────────────────────────────────────────
 if st.session_state['delete_confirm_id']:

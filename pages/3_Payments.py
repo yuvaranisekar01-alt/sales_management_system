@@ -81,32 +81,38 @@ st.markdown("---")
 
 # ── PAYMENT RECORDS TABLE ─────────────────────────────────────────────────────
 st.subheader("📋 Payment Records")
+st.write(f"Total Records: {len(payments)}")
 
 if payments.empty:
     st.info("No payment records found.")
 else:
-    header_cols = st.columns([1, 2, 2, 2, 2, 1, 1])
-    for col, h in zip(header_cols, ["Pay ID", "Sale ID", "Date", "Amount", "Method", "✏️", "🗑️"]):
-        col.markdown(f"**{h}**")
+    with st.expander("📂 Show Payment Records", expanded=False):
+        
+        # Prepare display copy
+        display_df = payments[['payment_id', 'sale_id', 'payment_date', 'amount_paid', 'payment_method']].copy()
+        display_df.columns = ['Pay ID', 'Sale ID', 'Date', 'Amount (₹)', 'Method']
 
-    for _, row in payments.iterrows():
-        pid  = row['payment_id']
-        cols = st.columns([1, 2, 2, 2, 2, 1, 1])
-        cols[0].write(pid)
-        cols[1].write(row['sale_id'])
-        cols[2].write(str(row['payment_date'])[:10])
-        cols[3].write(f"₹{row['amount_paid']:,.2f}")
-        cols[4].write(row['payment_method'])
+        # Format columns
+        display_df['Date']       = display_df['Date'].astype(str).str[:10]
+        display_df['Amount (₹)'] = display_df['Amount (₹)'].apply(lambda x: f"₹{x:,.2f}")
 
-        if cols[5].button("✏️", key=f"ep_{pid}"):
-            st.session_state['edit_payment_id'] = pid
-            st.session_state['delete_confirm_payment_id'] = None
+        # Scrollable dataframe
+        st.dataframe(display_df, use_container_width=True, height=300)
 
-        if cols[6].button("🗑️", key=f"dp_{pid}"):
-            st.session_state['delete_confirm_payment_id'] = pid
-            st.session_state['edit_payment_id'] = None
+        st.markdown("---")
 
-st.write(f"Total Records: {len(payments)}")
+        # Edit / Delete controls
+        pay_ids     = payments['payment_id'].tolist()
+        selected_pid = st.selectbox("Select Payment ID to Edit or Delete", options=pay_ids)
+
+        col1, col2 = st.columns(2)
+        if col1.button("✏️ Edit Selected", key="edit_payment_btn"):
+            st.session_state['edit_payment_id']              = selected_pid
+            st.session_state['delete_confirm_payment_id']    = None
+
+        if col2.button("🗑️ Delete Selected", key="delete_payment_btn"):
+            st.session_state['delete_confirm_payment_id']    = selected_pid
+            st.session_state['edit_payment_id']              = None
 
 # ── DELETE CONFIRMATION ───────────────────────────────────────────────────────
 if st.session_state['delete_confirm_payment_id']:
