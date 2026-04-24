@@ -1,41 +1,47 @@
 import streamlit as st
 import pandas as pd
-from database import get_connection
+from Database import get_connection
 
+# ── Auth Guard ────────────────────────────────────────────────────────────────
 if 'role' not in st.session_state:
     st.switch_page("Login.py")
 
-role = st.session_state['role']
+role      = st.session_state['role']
 branch_id = st.session_state['branch_id']
+
+# ✅ Restrict to Super Admin only
+if role != 'Super Admin':
+    st.warning("⛔ Access denied. This page is for Super Admins only.")
+    st.stop()
 
 st.title("🔍 SQL Queries")
 st.markdown("---")
 st.markdown("""
 <style>
-    .block-container {
-        padding-top: 2rem;
-    }
+    .block-container { padding-top: 2rem; }
 </style>
 """, unsafe_allow_html=True)
 
-# Function to run any query
+# ── Query Runner ──────────────────────────────────────────────────────────────
 def run_query(query, params=None):
     conn = get_connection()
-    if params:
-        df = pd.read_sql(query, conn, params=params)
-    else:
-        df = pd.read_sql(query, conn)
-    conn.close()
+    try:
+        if params:
+            df = pd.read_sql(query, conn, params=params)
+        else:
+            df = pd.read_sql(query, conn)
+    finally:
+        conn.close()
     return df
 
-# Dictionary of predefined queries
+# ── Predefined Queries ────────────────────────────────────────────────────────
 queries = {
     "Total Sales Per Branch": """
-        SELECT b.branch_name, 
-               COUNT(cs.sale_id) as total_sales,
-               SUM(cs.gross_sales) as total_gross,
-               SUM(cs.received_amount) as total_received,
-               SUM(cs.pending_amount) as total_pending
+        SELECT b.branch_name,
+               COUNT(cs.sale_id)        as total_sales,
+               SUM(cs.gross_sales)      as total_gross,
+               SUM(cs.received_amount)  as total_received,
+               SUM(cs.pending_amount)   as total_pending
         FROM customer_sales cs
         JOIN branches b ON cs.branch_id = b.branch_id
         GROUP BY b.branch_name
@@ -43,7 +49,7 @@ queries = {
     """,
 
     "Pending Payments by Customer": """
-        SELECT cs.name, 
+        SELECT cs.name,
                b.branch_name,
                cs.product_name,
                cs.gross_sales,
@@ -52,14 +58,14 @@ queries = {
                cs.status
         FROM customer_sales cs
         JOIN branches b ON cs.branch_id = b.branch_id
-        WHERE cs.status IN ('Open', 'open')
+        WHERE cs.status = 'Open'
         ORDER BY cs.pending_amount DESC
     """,
 
     "Payment Method Summary": """
         SELECT payment_method,
-               COUNT(*) as total_transactions,
-               SUM(amount_paid) as total_amount
+               COUNT(*)          as total_transactions,
+               SUM(amount_paid)  as total_amount
         FROM payment_splits
         GROUP BY payment_method
         ORDER BY total_amount DESC
@@ -78,10 +84,10 @@ queries = {
     """,
 
     "Monthly Sales Summary": """
-        SELECT strftime('%Y-%m', date) as month,
-               COUNT(*) as total_sales,
-               SUM(gross_sales) as total_gross,
-               SUM(received_amount) as total_received
+        SELECT strftime('%Y-%m', date)  as month,
+               COUNT(*)                 as total_sales,
+               SUM(gross_sales)         as total_gross,
+               SUM(received_amount)     as total_received
         FROM customer_sales
         GROUP BY month
         ORDER BY month
@@ -89,10 +95,10 @@ queries = {
 
     "Branch Performance Summary": """
         SELECT b.branch_name,
-               COUNT(cs.sale_id) as total_sales,
-               SUM(cs.gross_sales) as total_gross,
-               SUM(cs.received_amount) as total_received,
-               SUM(cs.pending_amount) as total_pending,
+               COUNT(cs.sale_id)        as total_sales,
+               SUM(cs.gross_sales)      as total_gross,
+               SUM(cs.received_amount)  as total_received,
+               SUM(cs.pending_amount)   as total_pending,
                ROUND(SUM(cs.pending_amount) * 100.0 / SUM(cs.gross_sales), 2) as pending_percentage
         FROM customer_sales cs
         JOIN branches b ON cs.branch_id = b.branch_id
@@ -100,8 +106,7 @@ queries = {
     """
 }
 
-        
-
+# ── Query Selector ────────────────────────────────────────────────────────────
 st.subheader("📋 Select a Query to Run")
 
 selected_query = st.selectbox("Choose a query", list(queries.keys()))
@@ -109,23 +114,16 @@ selected_query = st.selectbox("Choose a query", list(queries.keys()))
 with st.expander("👀 View SQL Code"):
     st.code(queries[selected_query], language='sql')
 
-result = None  # initialize
-
+# ── Run Query ─────────────────────────────────────────────────────────────────
 if st.button("▶️ Run Query", type='primary'):
     with st.spinner("Running query..."):
         result = run_query(queries[selected_query])
-        
+
         if result.empty:
             st.warning("No results found!")
         else:
-            # ✅ Admin filtering BEFORE display
-            if role == 'Admin' and 'branch_name' in result.columns:
-                branch_name = run_query(
-                    "SELECT branch_name FROM branches WHERE branch_id = ?", 
-                    params=[branch_id]
-                )['branch_name'].values[0]
-
-                result = result[result['branch_name'] == branch_name]
-
             st.success(f"✅ Query returned {len(result)} rows")
-            st.dataframe(result, width='stretch')
+            st.dataframe(result, use_container_width=True)  # ✅ fixed
+            
+            
+            

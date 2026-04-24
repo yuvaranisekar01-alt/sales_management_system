@@ -1,10 +1,6 @@
 import streamlit as st
-import pandas as pd
-import altair as alt
-import matplotlib.pyplot as plt
-import numpy as np
-from database import get_connection, create_tables
-from database import check_login
+from Database import get_connection, create_tables
+from Database import check_login
 
 #login page
 st.set_page_config(layout="centered", page_title="Sales Management System", page_icon=":bar_chart:")
@@ -49,3 +45,5 @@ if login_button:
             st.session_state['branch_id'] = user[3]
             st.success("Welcome, " + user[1] + "!")
             st.switch_page("pages/1_Dashboard.py")
+
+            

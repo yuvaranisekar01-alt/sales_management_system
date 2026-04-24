@@ -1,14 +1,15 @@
 import streamlit as st
 import pandas as pd
-from database import get_customer_sales, get_branches, add_sale, update_sale, delete_sale
+from Database import get_customer_sales, get_branches, add_sale, update_sale, delete_sale
 
+# ── Auth Guard ────────────────────────────────────────────────────────────────
 if 'role' not in st.session_state:
     st.switch_page("Login.py")
 
-role = st.session_state['role']
+role   = st.session_state['role']
 branch = st.session_state['branch_id']
 
-# Session state for edit/delete
+# ── Session State ─────────────────────────────────────────────────────────────
 if 'edit_sale_id' not in st.session_state:
     st.session_state['edit_sale_id'] = None
 if 'delete_confirm_id' not in st.session_state:
@@ -17,35 +18,38 @@ if 'delete_confirm_id' not in st.session_state:
 st.title("🧾 Sales")
 st.markdown("---")
 
-sales = get_customer_sales()
+# ── Load Data ─────────────────────────────────────────────────────────────────
+sales    = get_customer_sales()
 branches = get_branches()
 sales['status'] = sales['status'].str.capitalize()
 
 if role == 'Admin':
     sales = sales[sales['branch_id'] == branch]
 
+# ── Filters ───────────────────────────────────────────────────────────────────
 st.subheader("🔍 Filter Sales")
-
 col1, col2, col3 = st.columns(3)
+
 with col1:
     if role == 'Super Admin':
-        branch_names = ['All Branches'] + list(branches['branch_name'])
+        branch_names    = ['All Branches'] + list(branches['branch_name'])
         selected_branch = st.selectbox("🏢 Branch", branch_names)
         if selected_branch != 'All Branches':
             branch_id_filter = branches[branches['branch_name'] == selected_branch]['branch_id'].values[0]
             sales = sales[sales['branch_id'] == branch_id_filter]
+
 with col2:
-    status_options = ['All', 'Open', 'Close']
-    selected_status = st.selectbox("📋 Status", status_options)
+    selected_status = st.selectbox("📋 Status", ['All', 'Open', 'Close'])
     if selected_status != 'All':
         sales = sales[sales['status'] == selected_status]
+
 with col3:
-    products = ['All'] + list(sales['product_name'].unique())
+    products         = ['All'] + list(sales['product_name'].unique())
     selected_product = st.selectbox("📦 Product", products)
     if selected_product != 'All':
         sales = sales[sales['product_name'] == selected_product]
 
-
+# ── Sales Records ─────────────────────────────────────────────────────────────
 st.markdown("---")
 st.subheader("📋 Sales Records")
 st.write(f"Total Records: {len(sales)}")
@@ -54,34 +58,29 @@ with st.expander("📂 Show Sales Records", expanded=False):
     if sales.empty:
         st.info("No records found.")
     else:
-        # Prepare a display-friendly copy
-        display_df = sales[['sale_id', 'name', 'product_name', 'gross_sales', 'received_amount', 'pending_amount', 'status']].copy()
+        display_df = sales[['sale_id', 'name', 'product_name', 'gross_sales',
+                             'received_amount', 'pending_amount', 'status']].copy()
         display_df.columns = ['ID', 'Customer', 'Product', 'Gross (₹)', 'Received (₹)', 'Pending (₹)', 'Status']
-
-        # Format currency columns
         display_df['Gross (₹)']    = display_df['Gross (₹)'].apply(lambda x: f"₹{x:,.2f}")
         display_df['Received (₹)'] = display_df['Received (₹)'].apply(lambda x: f"₹{x:,.2f}")
         display_df['Pending (₹)']  = display_df['Pending (₹)'].apply(lambda x: f"₹{x:,.2f}")
 
-        # Render the dataframe (scrollable, fixed height)
-        st.dataframe(display_df, use_container_width=True, height=300)
-
+        # ✅ Hide the default index column
+        st.dataframe(display_df, use_container_width=True, height=300, hide_index=True)
         st.markdown("---")
 
-        # Edit / Delete controls below the dataframe
-        sale_ids = sales['sale_id'].tolist()
+        sale_ids    = sales['sale_id'].tolist()
         selected_id = st.selectbox("Select Sale ID to Edit or Delete", options=sale_ids)
 
         col1, col2 = st.columns(2)
         if col1.button("✏️ Edit Selected"):
-            st.session_state['edit_sale_id'] = selected_id
+            st.session_state['edit_sale_id']      = selected_id
             st.session_state['delete_confirm_id'] = None
-
         if col2.button("🗑️ Delete Selected"):
             st.session_state['delete_confirm_id'] = selected_id
-            st.session_state['edit_sale_id'] = None
+            st.session_state['edit_sale_id']      = None
 
-# ── DELETE CONFIRMATION ──────────────────────────────────────────────────────
+# ── Delete Confirmation ───────────────────────────────────────────────────────
 if st.session_state['delete_confirm_id']:
     del_id = st.session_state['delete_confirm_id']
     st.warning(f"⚠️ Are you sure you want to delete Sale ID **{del_id}**?")
@@ -93,15 +92,19 @@ if st.session_state['delete_confirm_id']:
         st.rerun()
     if c2.button("❌ Cancel"):
         st.session_state['delete_confirm_id'] = None
+        st.cache_data.clear() 
         st.rerun()
 
-# ── EDIT FORM ────────────────────────────────────────────────────────────────
+# ── Edit Form ─────────────────────────────────────────────────────────────────
 if st.session_state['edit_sale_id']:
-    edit_id = st.session_state['edit_sale_id']
-    sale_row = sales[sales['sale_id'] == edit_id]
+    edit_id  = st.session_state['edit_sale_id']
+    
+    # ✅ Load fresh unfiltered data for edit
+    all_sales = get_customer_sales()
+    sale_row  = all_sales[all_sales['sale_id'] == edit_id]
 
     if sale_row.empty:
-        st.warning("Sale not found (it may have been filtered out). Clear filters to edit.")
+        st.warning("Sale not found.")
     else:
         s = sale_row.iloc[0]
         st.markdown("---")
@@ -111,46 +114,53 @@ if st.session_state['edit_sale_id']:
             col1, col2 = st.columns(2)
             with col1:
                 if role == 'Super Admin':
-                    branch_options = branches['branch_name'].tolist()
-                    default_branch = branches[branches['branch_id'] == s['branch_id']]['branch_name'].values
-                    default_idx = branch_options.index(default_branch[0]) if len(default_branch) else 0
+                    branch_options   = branches['branch_name'].tolist()
+                    default_branch   = branches[branches['branch_id'] == s['branch_id']]['branch_name'].values
+                    default_idx      = branch_options.index(default_branch[0]) if len(default_branch) else 0
                     edit_branch_name = st.selectbox("🏢 Branch", branch_options, index=default_idx)
-                    edit_branch_id = branches[branches['branch_name'] == edit_branch_name]['branch_id'].values[0]
+                    edit_branch_id   = branches[branches['branch_name'] == edit_branch_name]['branch_id'].values[0]
                 else:
-                    edit_branch_id = s['branch_id']
-                    st.text_input("Branch ID", value=edit_branch_id, disabled=True)
+                    edit_branch_id = int(s['branch_id'])
+                    st.text_input("Branch", value=edit_branch_id, disabled=True)
 
-                edit_name = st.text_input("👤 Customer Name", value=s['name'])
-                edit_mobile = st.text_input("📱 Mobile Number", value=s['mobile_number'])
-                edit_product = st.text_input("📦 Product Name", value=s['product_name'])
+                edit_name    = st.text_input("👤 Customer Name",  value=str(s['name']))
+                edit_mobile  = st.text_input("📱 Mobile Number",  value=str(s['mobile_number']))
+                edit_product = st.text_input("📦 Product Name",   value=str(s['product_name']))
 
             with col2:
-                edit_date = st.date_input("📅 Date", value=pd.to_datetime(s['date']))
-                edit_gross = st.number_input("💰 Gross Sales", min_value=0.0, value=float(s['gross_sales']))
+                edit_date     = st.date_input("📅 Date", value=pd.to_datetime(s['date']))
+                edit_gross    = st.number_input("💰 Gross Sales",     min_value=0.0, value=float(s['gross_sales']))
                 edit_received = st.number_input("✅ Received Amount", min_value=0.0, value=float(s['received_amount']))
-                status_list = ["Open", "Close"]
-                edit_status = st.selectbox("📋 Status", status_list,
-                                           index=status_list.index(s['status']) if s['status'] in status_list else 0)
+                status_list   = ["Open", "Close"]
+                edit_status   = st.selectbox("📋 Status", status_list,
+                                             index=status_list.index(s['status']) if s['status'] in status_list else 0)
 
             c1, c2 = st.columns(2)
-            save = c1.form_submit_button("💾 Save Changes", use_container_width=True, type="primary")
-            cancel = c2.form_submit_button("❌ Cancel", use_container_width=True)
+            save   = c1.form_submit_button("💾 Save Changes", use_container_width=True, type="primary")
+            cancel = c2.form_submit_button("❌ Cancel",        use_container_width=True)
 
         if save:
             if not edit_name or not edit_mobile or not edit_product:
                 st.error("Please fill all fields!")
+            elif edit_received > edit_gross:
+                st.error("Received amount cannot exceed gross sales!")
             else:
-                update_sale(edit_id, edit_branch_id, edit_date, edit_name,
-                            edit_mobile, edit_product, edit_gross, edit_received, edit_status)
-                st.session_state['edit_sale_id'] = None
-                st.success("✅ Sale updated successfully!")
-                st.rerun()
+                try:
+                    # ✅ Show what's being saved
+                    st.write(f"DEBUG - Saving: id={edit_id}, name={edit_name}, "
+                             f"gross={edit_gross}, status={edit_status}")
+                    
+                    update_sale(edit_id, edit_branch_id, edit_date, edit_name,
+                                edit_mobile, edit_product, edit_gross,
+                                edit_received, edit_status)
+                    st.session_state['edit_sale_id'] = None
+                    st.success("✅ Sale updated successfully!")
+                    st.cache_data.clear() 
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Error: {e}")
 
-        if cancel:
-            st.session_state['edit_sale_id'] = None
-            st.rerun()
-
-# ── ADD NEW SALE ─────────────────────────────────────────────────────────────
+# ── Add New Sale ──────────────────────────────────────────────────────────────
 st.markdown("---")
 st.subheader("➕ Add New Sale")
 
@@ -158,30 +168,42 @@ with st.form("add_sale_form"):
     col1, col2 = st.columns(2)
     with col1:
         if role == 'Super Admin':
-            branch_options = branches['branch_name'].tolist()
+            branch_options       = branches['branch_name'].tolist()
             selected_branch_name = st.selectbox("🏢 Branch", branch_options)
-            new_branch_id = branches[branches['branch_name'] == selected_branch_name]['branch_id'].values[0]
+            new_branch_id        = branches[branches['branch_name'] == selected_branch_name]['branch_id'].values[0]
         else:
             new_branch_id = branch
-            st.text_input("Branch ID", value=new_branch_id, disabled=True)
-    with col2:
-        new_date = st.date_input("📅 Date")
-        new_gross = st.number_input("💰 Gross Sales", min_value=0.0)
-        new_received = st.number_input("✅ Received Amount", min_value=0.0)
-        new_status = st.selectbox("📋 Status", ["Open", "Close"])
-        new_name = st.text_input("👤 Customer Name")
-        new_mobile = st.text_input("📱 Mobile Number")
+            st.text_input("Branch", value=new_branch_id, disabled=True)
+
+        new_name    = st.text_input("👤 Customer Name")
+        new_mobile  = st.text_input("📱 Mobile Number")
         new_product = st.text_input("📦 Product Name")
-        submit = st.form_submit_button("Add Sale", use_container_width=True)
 
-if submit:
-    if not new_name or not new_mobile or not new_product:
-        st.error("Please fill all fields!")
-    else:
-        add_sale(new_branch_id, new_date, new_name, new_mobile,
-                 new_product, new_gross, new_received, new_status)
-        st.success("✅ Sale added successfully!")
-        st.rerun()
+    with col2:
+        new_date     = st.date_input("📅 Date")
+        new_gross    = st.number_input("💰 Gross Sales",     min_value=0.0)
+        new_received = st.number_input("✅ Received Amount", min_value=0.0)
+        new_status   = st.selectbox("📋 Status", ["Open", "Close"])
 
+
+    submit = st.form_submit_button("Add Sale", use_container_width=True, key="submit_add_sale")
+
+    if submit:
+        if not new_name or not new_mobile or not new_product:
+            st.error("Please fill all required fields!")
+        elif new_received > new_gross:
+            st.error("Received amount cannot exceed gross sales!")
+        else:
+            try:
+                add_sale(new_branch_id, new_date, new_name, new_mobile,
+                         new_product, new_gross, new_received, new_status)
+                st.success("✅ Sale added successfully!")
+                st.cache_data.clear() 
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ Failed to add sale: {e}")  # ✅ shows exact error
+
+# ── Navigation ────────────────────────────────────────────────────────────────
 if st.button("Go to Payments Page", type='primary'):
     st.switch_page("pages/3_Payments.py")
+    
